@@ -3,15 +3,21 @@
 
 
 if [ $# != 2 ]; then
-    echo -e "\nERROR: Not enough arguments\n  USAGE:"
-    echo "$0   /source/path/   /destination/file.au"
-    echo ""
-    echo "  /source/path/"
-    echo "      Must be a directory. Path containing *.au files, like 'project#####'"
-    echo "      (Recursively finds *.au files. Relative to current directory, if desired)"
-    echo "  /destination/file.au"
-    echo "      Path to the desired output file."
-    echo "      (Relative to current directory, if desired)"
+cat << HELP1
+
+ERROR: Not enough arguments
+
+  USAGE:
+$0   /source/path/   /destination/file.au
+
+  /source/path/
+      Must be a directory. Path containing *.au files, like 'project#####'
+      (Recursively finds *.au files. Relative to current directory, if desired)
+  /destination/file.au
+      Path to the desired output file.
+      (Relative to current directory, if desired)
+HELP1
+
     exit 1
 fi
 
