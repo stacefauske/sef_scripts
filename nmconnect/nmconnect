@@ -1,0 +1,333 @@
+#!/bin/bash
+#
+# Script to help connect to saved connections
+# and wifi signals using NetworkManager
+#
+# Written by Stace Fauske
+#
+
+## VARS ##
+currentconns=`nmcli con list | sort | sed 's/  .*$//g' | grep -v NAME`
+origIFS="${IFS}" # store the original IFS so it can be restored
+connstat=0
+listheader="nmcli con list | grep --color=never NAME"
+listenet="nmcli con list | sort | grep -v NAME | grep --color=never ethernet"
+listothers="nmcli con list | sort | grep -v NAME | grep -v ethernet"
+connexists=
+wifiexists=
+## END VARS ##
+
+
+
+## FUNCTIONS ##
+#
+
+#Restart NetworkMonitor applet
+appletrestart () {
+  runningapplet=`ps axu | grep nm-applet | grep -v grep`
+  if [ "$runningapplet" ] ; then
+    echo " Restarting nm-applet"
+    sleep 4
+    killall nm-applet 1>/dev/null 2>&1
+    sleep 1
+    nohup nm-applet 1>/dev/null 2>&1 & disown
+    sleep 1
+    echo " DONE"
+    echo ""
+  fi
+}
+# A listing of scanned wifi points
+wifilisting () {
+  echo ""
+  echo " Choose an SSID to connect to:"
+  echo ""
+  nmcli dev wifi list | grep --color=never SSID
+  nmcli dev wifi list | sort | grep -v SSID
+  echo -n "  Which wifi connection?  "
+  read wificonnection
+  case $wificonnection in
+    [xX]|[qQ] )
+      echo "  exit selected"
+      exit 0
+    ;;
+  esac
+}
+# Connect to the MD88 sim network
+md88connect () {
+  echo " Attempting connection to MD88 network"
+  #Connect to the network
+  nmcli con up id MD88-45_Ethernet
+  #Wait until the connection is active
+  sleep 1
+  netconnected=`nmcli con status | grep -o "MD88-45_Ethernet"`
+  connected=`nmcli nm status | grep -o connected`
+  conntimeout=0
+  until [ "$connected" == "connected" -a "$netconnected" == "MD88-45_Ethernet" ] ; do
+    sleep 1
+    conntimeout=$(( conntimeout + 1 ))
+    if [ "$conntimeout" == 15 ] ; then # X second timeout
+      echo " Timeout -- not connected"
+      exit 0
+    fi
+    netconnected=`nmcli con status | grep -o "MD88-45_Ethernet"`
+    connected=`nmcli nm status | grep -o connected`
+  done
+}
+# Successful connection information
+conninfo () {
+  echo ""
+  echo -n " IP ADDRESS --> "
+  ipaddr=`ifconfig | grep --color=never 'Bcast' | cut -d: -f1 --complement | cut -d\  -f1`
+  #~ ifconfig | grep --color=never 'Bcast' | grep --color=always "${ipaddr} " | cut -d: -f1 --complement | sed 's/          //'
+  ifconfig | grep --color=never 'Bcast' | grep --color=always -m1 "${ipaddr}" | cut -d: -f1 --complement | sed 's/          //'
+  route -n | sed 's/^/    |/g'
+  echo ""
+}
+# Custom connection inputs for $1 and $manconnection
+customconn () {
+  case $1 in
+    88 ) # Connect to the MD88 sim network
+      md88connect # (function)
+      #Give some info back
+      conninfo # (function)
+      #Restart NetworkMonitor applet
+      appletrestart # (function)
+      exit 0
+    ;;
+    [hH][eE][lL][pP]|-[hH][eE][lL][pP]|--[hH][eE][lL][pP]|-[hH] )
+      scripthelp # (function)
+      exit 0
+    ;;
+  esac
+  case $manconnection in
+    88 ) # Connect to the MD88 sim network
+      md88connect # (function)
+      #Give some info back
+      conninfo # (function)
+      #Restart NetworkMonitor applet
+      appletrestart # (function)
+      exit 0
+    ;;
+    [hH][eE][lL][pP]|-[hH][eE][lL][pP]|--[hH][eE][lL][pP]|-[hH] )
+      scripthelp # (function)
+      exit 0
+    ;;
+  esac
+}
+# Help for this script
+scripthelp () {
+less << EOF
+ NAME
+       nmconnect - connect to a network using NetworkManager nmcli commands
+ 
+ SYNOPSIS
+       nmconnect [--help|(saved-connection)]
+ 
+ DESCRIPTION
+       Connect to the specified saved connection.
+       Choose a saved connection if none specified.
+       Or optionally connect to a wifi signal if \`NONE'
+       is entered at the prompt
+ 
+ 
+ 
+ **This is not a man page. It is simply some help text from within the script.
+ You will not be able to \`man nmconnect' unless someone writes a man page.
+ 
+ AUTHOR
+       Written by Stace Fauske.
+ 
+ COPYRIGHT
+       Copyright © 2015 Free Software Foundation, Inc.
+       License GPLv3+: GNU GPL version 3 or later
+       <http://gnu.org/licenses/gpl.html>
+       This is free software: you are free to change and redistribute it.
+       There is NO WARRANTY, to the extent permitted by law.
+EOF
+}
+## END FUNCTIONS ##
+###################
+
+
+
+
+
+
+###############
+# MAIN SCRIPT #
+###############
+
+
+
+# If a desired connection was entered with the nmconnect command
+if [ "$1" ] ; then
+  customconn # Custom connection inputs for $1 and $manconnection
+  IFS=$'\n' # set a temp IFS to newline for this section
+  for conname in $currentconns ; do
+    # If the desired connection WAS found
+    if [ "$1" == "$conname" ] ; then
+      echo "Attempting connection to ${1}..."
+      nmcli con up id "$conname"
+      connstat=1
+    fi
+  done
+  IFS="${origIFS}" # reset the IFS back to original
+  
+  # If the desired connection was NOT found:
+  if [ "$connstat" == 0 ] ; then
+    echo ""
+    echo " Sorry $1 is not a saved connection."
+    echo ""
+  fi
+fi
+
+
+
+
+# If no desired connection specified, show a listing of saved confs
+
+# this section just gets the name of the desired connection
+sleep 1
+if [ "$connstat" == 0 ] ; then
+  until [ "$connexists" ] ; do
+    # List saved connections
+    echo " Please choose a NAME from the list of saved connections below,"
+    echo " Or enter NONE to scan for wifi signals"
+    echo ""
+    eval $listheader
+    echo "              +++ WIRELESS +++"
+    eval $listothers
+    echo "              +++ ETHERNET +++"
+    eval $listenet
+    echo ""
+    echo " Which saved connection?"
+    echo " (enter WIFI to scan for APs  -or-  X to exit)"
+    echo -n "      > "
+    read manconnection
+    case $manconnection in
+      [xX]|[qQ] )
+        echo "  exit selected"
+        exit 0
+      ;;
+    esac
+
+
+    if [ "$manconnection" ] ; then
+      case $manconnection in # manconnection returned from connlisting function
+        [nN][oO][nN][eE]|[wW][iI][fF][iI] ) # If a wifi scan is requested
+          connexists="wifi was requested azbycx"
+          wifilisting # (function - returns $wificonnection)
+          if [ "$wificonnection" ] ; then # if a connection is desired - initial attempt
+            wifiexists=`nmcli dev wifi list | grep "${wificonnection}"` # check to see if that wifi point exists
+            manconnection="${wificonnection}"
+          fi
+          until [ "$wifiexists" ] ; do # if no initial wifi connection, try again here - and loop until it works
+            echo ""
+            echo " -- That wifi connection does not exist, please choose a connection --"
+            wifilisting # (function - returns $wificonnection)
+            if [ "$wificonnection" ] ; then
+              case $wificonnection in
+                [xXqQ]|[eEqQ][xXuU][iI][tT] )
+                  echo " Exit selected"
+                  exit 0
+                ;;
+                * )
+                  wifiexists=`nmcli dev wifi list | grep "${wificonnection}"`
+                ;;
+              esac
+            fi
+          done
+          echo " Attempting wifi connection"
+          nmcli dev wifi connect "$wificonnection"
+          wificonnected="$wificonnection"
+          echo ""
+        ;;
+      esac
+      customconn # Custom connection inputs for $1 and $manconnection
+      connstored=`nmcli con list | grep -o "${manconnection}"`
+      if [ "$connstored" ] ; then
+        connexists=`nmcli con list | grep "${manconnection}" | cut -c1-26 | rev | tr -s \  | sed 's/^ //' | rev`
+      fi
+    fi
+
+
+    if [ ! "$connexists" ] ; then
+      echo ""
+      echo " -- That connection does not exist, please choose an existing connection --"
+      echo ""
+    fi
+  done
+fi
+
+
+
+
+# FINALLY...
+# If not connecting to wifi, connect to specified connection
+if [ ! "$wifiexists" ] ; then
+  nmcli con up id "$manconnection"
+  manconnected="$manconnection" ##
+  echo ""
+fi
+
+
+
+
+# Wait until the connection is active
+sleep 1
+netconnected=`nmcli con status | grep -o "${manconnection}"`
+connected=`nmcli nm status | grep -o connected`
+#~ conntimeout=0
+#~ until [ "$connected" == "connected" -a "$netconnected" == "$manconnection" ] ; do
+  #~ echo "'connected' is:  $connected"
+  #~ echo 'nmcli con status | grep -o "${manconnection}"'
+  #~ echo "'netconnected' is:  $netconnected"
+  #~ echo "'manconnection' is:  $manconnection"
+  #~ sleep 1
+  #~ conntimeout=$(( conntimeout + 1 ))
+  #~ if [ "$conntimeout" == 15 ] ; then # X second timeout
+    #~ echo " Timeout -- not connected"
+    #~ exit 0
+  #~ fi
+  #~ netconnected=`nmcli con status | grep -o "${manconnection}"`
+  #~ connected=`nmcli nm status | grep -o connected`
+#~ done
+# Replaced above with this:
+if [ "$connected" == "connected" -a "$netconnected" == "$manconnection" ] ; then
+  echo "'connected' is --  $connected"
+  echo 'nmcli con status | grep -o "${manconnection}"'
+  echo "'netconnected' is --  $netconnected"
+  echo "'manconnection' is --  $manconnection"
+  echo " !! CONNECTED !!"
+else
+  echo -e "\n Could not connect to '${manconnection}'"
+  echo " Exiting"
+  exit 0
+fi
+
+
+
+
+
+# Give info back on the connection name
+if [ "$manconnected" ] ; then # if manually connected
+  echo " *Connected to ${manconnected}!"
+elif [ "$wificonnected" ] ; then # if new connection to wifi AP
+  echo " *Connected to ${wificonnected}!"
+else
+  echo " *Connected to ${1}!" # If connected via 'nmconnect something'
+fi
+
+
+
+# Give detailed info back about the connection
+conninfo
+
+
+
+# Restart NetworkMonitor applet
+appletrestart
+
+
+
+exit 0
