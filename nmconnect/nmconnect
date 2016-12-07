@@ -7,12 +7,8 @@
 #
 
 ## VARS ##
-currentconns=`nmcli con list | sort | sed 's/  .*$//g' | grep -v NAME`
 origIFS="${IFS}" # store the original IFS so it can be restored
 connstat=0
-listheader="nmcli con list | grep --color=never NAME"
-listenet="nmcli con list | sort | grep -v NAME | grep --color=never ethernet"
-listothers="nmcli con list | sort | grep -v NAME | grep -v ethernet"
 connexists=
 wifiexists=
 ## END VARS ##
@@ -21,7 +17,89 @@ wifiexists=
 
 ## FUNCTIONS ##
 #
-
+#Listing of the existing connections
+#~ main () {  ############# DISABLED FUNCTION - see below at 'main'
+  #~ currentconns=`nmcli con list | sort | sed 's/  .*$//g' | grep -v NAME`
+  #~ listheader="nmcli con list | grep --color=never NAME"
+  #~ listenet="nmcli con list | sort | grep -v NAME | grep --color=never ethernet"
+  #~ listothers="nmcli con list | sort | grep -v NAME | grep -v ethernet"
+  #~ if [ "$connstat" == 0 ] ; then
+    #~ until [ "$connexists" ] ; do
+      #~ # List saved connections
+      #~ echo " Please choose a NAME from the list of saved connections below,"
+      #~ echo " Or enter NONE to scan for wifi signals"
+      #~ echo ""
+      #~ eval $listheader
+      #~ echo "              +++ WIRELESS +++"
+      #~ eval $listothers
+      #~ echo "              +++ ETHERNET +++"
+      #~ eval $listenet
+      #~ echo ""
+      #~ echo " Which saved connection?"
+      #~ echo " (enter WIFI to scan for APs  -or-  X to exit)"
+      #~ echo -n "      > "
+      #~ read manconnection
+      #~ case $manconnection in
+        #~ [xX]|[qQ] )
+          #~ echo "  exit selected"
+          #~ exit 0
+        #~ ;;
+      #~ esac
+  #~ 
+  #~ 
+      #~ if [ "$manconnection" ] ; then
+        #~ case $manconnection in # manconnection returned from connlisting function
+          #~ [nN][oO][nN][eE]|[wW][iI][fF][iI] ) # If a wifi scan is requested
+            #~ connexists="wifi was requested azbycx"
+            #~ wifilisting # (function - returns $wificonnection)
+            #~ if [ "$wificonnection" ] ; then # if a connection is desired - initial attempt
+              #~ wifiexists=`nmcli dev wifi list | grep "${wificonnection}"` # check to see if that wifi point exists
+              #~ manconnection="${wificonnection}"
+            #~ fi
+            #~ until [ "$wifiexists" ] ; do # if no initial wifi connection, try again here - and loop until it works
+              #~ echo ""
+              #~ echo " -- That wifi connection does not exist, please choose a connection --"
+              #~ wifilisting # (function - returns $wificonnection)
+              #~ if [ "$wificonnection" ] ; then
+                #~ case $wificonnection in
+                  #~ [xXqQ]|[eEqQ][xXuU][iI][tT] )
+                    #~ echo " Exit selected"
+                    #~ exit 0
+                  #~ ;;
+                  #~ [rR]|[rR][eE][sS][tT][aA][rR][tT] )
+                    #~ echo " Restart functionality inwork"
+                    #~ echo " Exiting"
+                    #~ exit 0
+                  #~ ;;
+                  #~ * )
+                    #~ wifiexists=`nmcli dev wifi list | grep "${wificonnection}"`
+                  #~ ;;
+                #~ esac
+              #~ fi
+            #~ done
+            #~ echo " Attempting wifi connection"
+            #~ nmcli dev wifi connect "$wificonnection"
+            #~ wificonnected="$wificonnection"
+            #~ echo ""
+          #~ ;;
+        #~ esac
+        #~ customconn # Custom connection inputs for $1 and $manconnection
+        #~ connstored=`nmcli con list | grep -o "${manconnection}"`
+        #~ if [ "$connstored" ] ; then
+          #~ connexists=`nmcli con list | grep "${manconnection}" | cut -c1-26 | rev | tr -s \  | sed 's/^ //' | rev`
+        #~ fi
+      #~ fi
+  #~ 
+  #~ 
+      #~ if [ ! "$connexists" ] ; then
+        #~ echo ""
+        #~ echo " -- That connection does not exist, please choose an existing connection --"
+        #~ echo ""
+      #~ fi
+    #~ done
+  #~ fi
+#~ }
+  
 #Restart NetworkMonitor applet
 appletrestart () {
   runningapplet=`ps axu | grep nm-applet | grep -v grep`
@@ -48,6 +126,11 @@ wifilisting () {
   case $wificonnection in
     [xX]|[qQ] )
       echo "  exit selected"
+      exit 0
+    ;;
+    [rR]|[rR][eE][sS][tT][aA][rR][tT] )
+      echo " Restart functionality inwork"
+      echo " Exiting"
       exit 0
     ;;
   esac
@@ -188,6 +271,12 @@ fi
 
 # this section just gets the name of the desired connection
 sleep 1
+# run the main script
+#~ main # Don't run this as a function, just run it instead...
+currentconns=`nmcli con list | sort | sed 's/  .*$//g' | grep -v NAME`
+listheader="nmcli con list | grep --color=never NAME"
+listenet="nmcli con list | sort | grep -v NAME | grep --color=never ethernet"
+listothers="nmcli con list | sort | grep -v NAME | grep -v ethernet"
 if [ "$connstat" == 0 ] ; then
   until [ "$connexists" ] ; do
     # List saved connections
@@ -231,6 +320,11 @@ if [ "$connstat" == 0 ] ; then
                   echo " Exit selected"
                   exit 0
                 ;;
+                [rR]|[rR][eE][sS][tT][aA][rR][tT] )
+                  echo " Restart functionality inwork"
+                  echo " Exiting"
+                  exit 0
+                ;;
                 * )
                   wifiexists=`nmcli dev wifi list | grep "${wificonnection}"`
                 ;;
@@ -258,6 +352,7 @@ if [ "$connstat" == 0 ] ; then
     fi
   done
 fi
+# END main
 
 
 
@@ -294,10 +389,12 @@ connected=`nmcli nm status | grep -o connected`
 #~ done
 # Replaced above with this:
 if [ "$connected" == "connected" -a "$netconnected" == "$manconnection" ] ; then
-  echo "'connected' is --  $connected"
-  echo 'nmcli con status | grep -o "${manconnection}"'
-  echo "'netconnected' is --  $netconnected"
-  echo "'manconnection' is --  $manconnection"
+  echo ""
+  echo "'connected' is --  ${connected}"
+  echo " nmcli con status | grep -o \"${manconnection}\""
+  echo "'netconnected' is --  ${netconnected}"
+  echo "'manconnection' is --  ${manconnection}"
+  echo ""
   echo " !! CONNECTED !!"
 else
   echo -e "\n Could not connect to '${manconnection}'"
@@ -327,6 +424,12 @@ conninfo
 
 # Restart NetworkMonitor applet
 appletrestart
+
+
+echo " nmconnect finished"
+echo -n " <cr> to exit script "
+read redy
+echo -n -e "\n Exit selected "
 
 
 

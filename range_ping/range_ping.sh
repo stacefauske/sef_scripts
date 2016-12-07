@@ -9,6 +9,9 @@
 # Set the variables below appropriately:
 
 
+echo ""
+
+
 # checking to make sure script is running with root privileges
 if [ "$(whoami)" != "root" ] ; then
     echo " This script will perform better as root or run with sudo."
@@ -105,15 +108,22 @@ FILEEXISTS
 fi
 
 
-echo "" > ./${fileforlog}
-echo " -- Started -- `date`" >> ./${fileforlog}
-echo "" >> ./${fileforlog}
-echo " PINGING ${ipstart}.xxx" >> ./${fileforlog}
-echo "" >> ./${fileforlog}
+touch ./${fileforlog}
+chmod 664 ./${fileforlog}
 
-echo ""
-echo " -- Started -- `date`"
-echo " PINGING ${ipstart}.xxx"
+
+echo "" > ./${fileforlog}
+echo " -- Started -- `date`" | tee -a ./${fileforlog}
+echo "" | tee -a ./${fileforlog}
+echo "   ==========================" | tee -a ./${fileforlog}
+echo "  /" | tee -a ./${fileforlog}
+echo " <  PINGING ${ipstart}.xxx" | tee -a ./${fileforlog}
+echo "  \\" | tee -a ./${fileforlog}
+echo "   ==========================" | tee -a ./${fileforlog}
+
+#~ echo ""
+#~ echo " -- Started -- `date`"
+#~ echo " PINGING ${ipstart}.xxx"
 echo ""
 echo ""
 echo ""
@@ -134,18 +144,22 @@ for i in $(seq ${startip} ${endip}); do
       -q )
       ;;
       * )
-        echo ""
+        echo -e "\n ========================================="
+        echo      " === pinging ${ipstart}.${i} === FOUND ==="
+        echo      " ========================================="
         echo "${try}"
       ;;
     esac
-    echo ${ipstart}.${i} >> ./${fileforlog}
+    echo " ---------------------------" >> ./${fileforlog}
+    echo "" | tee -a ./${fileforlog}
+    echo "Found at ${ipstart}.${i}" | tee -a ./${fileforlog}
+    echo ""
     echo ${try} >> ./${fileforlog}
     ${apngcmd} ${ipstart}.${i} | tee -a ./${fileforlog}
     ${arpcmd} ${ipstart}.${i} | tee -a ./${fileforlog}
     ${nmapcmd} ${ipstart}.${i} | tee -a ./${fileforlog}
     echo "" | tee -a ./${fileforlog}
-    echo " ---------------------------" | tee -a ./${fileforlog}
-    echo "" | tee -a ./${fileforlog}
+    echo " ---------------------------"
   fi
 done
 
@@ -155,6 +169,8 @@ done
 
 echo "" | tee -a ./${fileforlog}
 echo "" | tee -a ./${fileforlog}
+echo " ---------------------------" | tee -a ./${fileforlog}
+echo " ---------------------------" | tee -a ./${fileforlog}
 echo " ---------------------------" | tee -a ./${fileforlog}
 echo "" | tee -a ./${fileforlog}
 echo " -- Ended --   `date`" | tee -a ./${fileforlog}
